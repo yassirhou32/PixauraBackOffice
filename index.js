@@ -2,9 +2,12 @@
  * Point d'entrée Vercel (serverless) : toutes les requêtes sont routées vers Express.
  * Déployez avec la racine du projet = dossier `backend` sur Vercel.
  *
- * OPTIONS (CORS preflight) répond sans attendre MongoDB — sinon le navigateur reste en "pending".
+ * IMPORTANT : sur @vercel/node, req/res sont des objets Node HTTP — l'app Express
+ * peut être appelée directement (sans `serverless-http`, qui est pour AWS Lambda).
+ *
+ * OPTIONS (CORS preflight) et GET / répondent sans attendre MongoDB pour éviter
+ * tout "loading infini" dans le navigateur.
  */
-const serverless = require("serverless-http");
 const connectDB = require("./src/config/db");
 const { seedAdmin } = require("./src/seedAdmin");
 
@@ -38,36 +41,77 @@ function applyCorsHeaders(req, res) {
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
-let handler;
+function requestPath(req) {
+  const u = req.url || req.originalUrl || "";
+  return (u.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+}
 
-async function getHandler() {
-  if (!handler) {
-    await connectDB();
-    await seedAdmin();
-    const app = require("./src/app");
-    handler = serverless(app);
+let appReady;
+
+async function getApp() {
+  if (!appReady) {
+    appReady = (async () => {
+      await connectDB();
+      try {
+        await seedAdmin();
+      } catch (e) {
+        console.warn("[seedAdmin] ignore:", e.message || e);
+      }
+      return require("./src/app");
+    })().catch((err) => {
+      appReady = null;
+      throw err;
+    });
   }
-  return handler;
+  return appReady;
 }
 
 module.exports = async (req, res) => {
+  const p = requestPath(req);
+
   if (req.method === "OPTIONS") {
     applyCorsHeaders(req, res);
-    res.status(204).end();
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET" && (p === "/" || p === "")) {
+    applyCorsHeaders(req, res);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.statusCode = 200;
+    res.end(
+      JSON.stringify({
+        ok: true,
+        service: "pixaura-api",
+        docs: "Routes sous /api — ex. POST /api/auth/login, GET /api/health",
+      })
+    );
+    return;
+  }
+
+  if (req.method === "GET" && p === "/favicon.ico") {
+    applyCorsHeaders(req, res);
+    res.statusCode = 204;
+    res.end();
     return;
   }
 
   try {
-    const handle = await getHandler();
-    return await handle(req, res);
+    const app = await getApp();
+    return app(req, res);
   } catch (err) {
     console.error("[vercel]", err);
     applyCorsHeaders(req, res);
     if (!res.headersSent) {
-      res.status(503).json({
-        message: err.message || "Service indisponible",
-        hint: "Verifiez MONGO_URI sur Vercel et la connexion Atlas.",
-      });
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.statusCode = 503;
+      res.end(
+        JSON.stringify({
+          message: err.message || "Service indisponible",
+          hint: "Verifiez MONGO_URI sur Vercel et la connectivite Atlas.",
+        })
+      );
     }
   }
 };
