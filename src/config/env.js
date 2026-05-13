@@ -11,5 +11,6 @@ module.exports = {
   smtpPort: Number(process.env.SMTP_PORT || 587),
   smtpUser: process.env.SMTP_USER,
   smtpPass: process.env.SMTP_PASS,
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+  /** Origine(s) du front pour CORS — trim pour éviter les espaces après = dans .env */
+  frontendUrl: (process.env.FRONTEND_URL || "http://localhost:3000").trim(),
 };

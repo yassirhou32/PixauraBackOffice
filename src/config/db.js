@@ -17,7 +17,12 @@ async function connectDB() {
 
   if (!g.promise) {
     g.promise = mongoose
-      .connect(mongoUri)
+      .connect(mongoUri, {
+        /** Évite de bloquer Vercel jusqu'au timeout de la fonction (preflight + API). */
+        serverSelectionTimeoutMS: 12_000,
+        connectTimeoutMS: 12_000,
+        socketTimeoutMS: 45_000,
+      })
       .then(() => mongoose.connection)
       .catch((err) => {
         g.promise = null;
