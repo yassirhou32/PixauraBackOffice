@@ -59,7 +59,7 @@ module.exports = async (req, res) => {
 
   try {
     const handle = await getHandler();
-    return handle(req, res);
+    return await handle(req, res);
   } catch (err) {
     console.error("[vercel]", err);
     applyCorsHeaders(req, res);

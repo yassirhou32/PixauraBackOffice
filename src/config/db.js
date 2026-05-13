@@ -10,6 +10,8 @@ async function connectDB() {
 
   if (mongoose.connection.readyState === 1) return;
 
+  mongoose.set("bufferCommands", false);
+
   if (!global.__mongooseConn) {
     global.__mongooseConn = { promise: null, logged: false };
   }
@@ -18,10 +20,16 @@ async function connectDB() {
   if (!g.promise) {
     g.promise = mongoose
       .connect(mongoUri, {
-        /** Évite de bloquer Vercel jusqu'au timeout de la fonction (preflight + API). */
-        serverSelectionTimeoutMS: 12_000,
-        connectTimeoutMS: 12_000,
+        /**
+         * Reste sous la limite Vercel Hobby (~10 s) pour que l'API renvoie 503 au lieu de couper en silence.
+         * @see https://mongoosejs.com/docs/lambda.html
+         */
+        serverSelectionTimeoutMS: 8_000,
+        connectTimeoutMS: 8_000,
         socketTimeoutMS: 45_000,
+        maxPoolSize: 10,
+        /** Souvent utile si la résolution IPv6 pose problème vers Atlas. */
+        family: 4,
       })
       .then(() => mongoose.connection)
       .catch((err) => {
