@@ -18,8 +18,17 @@ function isWeekRuleAllowed({ date, clientType }) {
   return false;
 }
 
+/** Vrai si la date est strictement avant aujourd'hui (jour civil local serveur). */
+function isPastDate(date) {
+  const target = dayjs(date).startOf("day");
+  const today = dayjs().startOf("day");
+  return target.isBefore(today);
+}
+
 function isClientDateAllowed({ date, clientType, blockedDates }) {
   const target = dayjs(date).startOf("day");
+
+  if (isPastDate(target)) return false;
 
   const isBlocked = blockedDates.some((blocked) => dayjs(blocked.date).startOf("day").isSame(target));
   if (isBlocked) return false;
@@ -43,4 +52,10 @@ function monthAvailability({ month, year, clientType, blockedDates }) {
   return result;
 }
 
-module.exports = { normalizeDateOnly, isWeekRuleAllowed, isClientDateAllowed, monthAvailability };
+module.exports = {
+  normalizeDateOnly,
+  isWeekRuleAllowed,
+  isPastDate,
+  isClientDateAllowed,
+  monthAvailability,
+};

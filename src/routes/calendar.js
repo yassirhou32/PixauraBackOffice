@@ -5,7 +5,7 @@ const BlockedSlot = require("../models/BlockedSlot");
 const Client = require("../models/Client");
 const Request = require("../models/Request");
 const { authRequired, roleRequired } = require("../middleware/auth");
-const { normalizeDateOnly, isWeekRuleAllowed } = require("../utils/calendarRules");
+const { normalizeDateOnly, isWeekRuleAllowed, isPastDate } = require("../utils/calendarRules");
 const {
   TIME_SLOTS,
   isValidSlotId,
@@ -129,6 +129,24 @@ router.get("/day-slots", authRequired, roleRequired("client"), async (req, res) 
   ]);
 
   if (!client) return res.status(404).json({ message: "Client introuvable" });
+
+  if (isPastDate(requestedDate)) {
+    return res.json({
+      date: dateKey,
+      allowedByProfile: false,
+      pastDate: true,
+      fullDayBlocked: false,
+      slots: TIME_SLOTS.map((def) => ({
+        id: def.id,
+        label: def.label,
+        startTime: def.startTime,
+        endTime: def.endTime,
+        available: false,
+        reason: "passe",
+      })),
+      slotDefinitions: TIME_SLOTS,
+    });
+  }
 
   const weekOk = isWeekRuleAllowed({
     date: requestedDate,

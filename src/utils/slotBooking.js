@@ -1,6 +1,6 @@
 const dayjs = require("dayjs");
 const { TIME_SLOTS, SLOT_IDS, slotIdFromLegacyTime, isValidSlotId, startTimeForSlot } = require("../constants/timeSlots");
-const { isWeekRuleAllowed } = require("./calendarRules");
+const { isWeekRuleAllowed, isPastDate } = require("./calendarRules");
 
 const ACTIVE_STATUSES = ["en_attente", "validee", "a_completer"];
 
@@ -129,7 +129,9 @@ function monthAvailabilityWithSlots({ month, year, clientType, blockedDates, blo
   for (let i = 1; i <= days; i += 1) {
     const current = dayjs(`${year}-${String(month).padStart(2, "0")}-${String(i).padStart(2, "0")}`);
     const dateKey = current.format("YYYY-MM-DD");
-    const inProfile = isWeekRuleAllowed({ date: current.toDate(), clientType });
+    const dateObj = current.toDate();
+    const past = isPastDate(dateObj);
+    const inProfile = isWeekRuleAllowed({ date: dateObj, clientType });
     const fullDayBlocked = isFullDayBlocked(blockedDates, dateKey);
     const hasFreeSlot = hasAnyFreeSlot({
       dateKey,
@@ -139,9 +141,10 @@ function monthAvailabilityWithSlots({ month, year, clientType, blockedDates, blo
     });
     result.push({
       date: dateKey,
-      /** Clic possible : règle semaine paire / impaire / VIP (sans tenir compte des réservations) */
-      selectable: inProfile,
+      /** Clic possible : pas de date passée + règle semaine paire / impaire / VIP */
+      selectable: !past && inProfile,
       inProfile,
+      isPast: past,
       fullDayBlocked,
       hasFreeSlot,
     });

@@ -5,7 +5,7 @@ const Client = require("../models/Client");
 const BlockedDate = require("../models/BlockedDate");
 const BlockedSlot = require("../models/BlockedSlot");
 const { authRequired, roleRequired } = require("../middleware/auth");
-const { normalizeDateOnly, isClientDateAllowed } = require("../utils/calendarRules");
+const { normalizeDateOnly, isClientDateAllowed, isPastDate } = require("../utils/calendarRules");
 const {
   isValidSlotId,
   startTimeForSlot,
@@ -64,6 +64,10 @@ router.post("/", authRequired, roleRequired("client"), async (req, res) => {
   const blockedDates = await BlockedDate.find();
   const requestedDate = normalizeDateOnly(req.body.requestedDate);
   const dateKey = dateKeyFromInput(requestedDate);
+
+  if (isPastDate(requestedDate)) {
+    return res.status(400).json({ message: "Impossible de reserver une date passee." });
+  }
 
   const allowed = isClientDateAllowed({ date: requestedDate, clientType: client.clientType, blockedDates });
   if (!allowed) {
