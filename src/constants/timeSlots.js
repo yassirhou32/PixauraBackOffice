@@ -9,8 +9,20 @@ const TIME_SLOTS = [
 
 const SLOT_IDS = TIME_SLOTS.map((s) => s.id);
 
+/** Réservation journée complète (5 créneaux) — compte pour 2 projets P2C du mois */
+const FULL_DAY_SLOT_ID = "journee-complete";
+
+function isFullDaySlotId(id) {
+  return id === FULL_DAY_SLOT_ID;
+}
+
 function isValidSlotId(id) {
-  return SLOT_IDS.includes(id);
+  return SLOT_IDS.includes(id) || isFullDaySlotId(id);
+}
+
+function isRequestFullDay(doc) {
+  if (!doc) return false;
+  return Boolean(doc.isFullDay) || isFullDaySlotId(doc.timeSlotId);
 }
 
 /** Anciennes demandes sans timeSlotId : déduire le créneau depuis l'heure de début */
@@ -31,4 +43,18 @@ function startTimeForSlot(slotId) {
   return s ? s.startTime : "08:00";
 }
 
-module.exports = { TIME_SLOTS, SLOT_IDS, isValidSlotId, slotIdFromLegacyTime, startTimeForSlot };
+function fullDayLabel() {
+  return "Journée complète (5 créneaux)";
+}
+
+module.exports = {
+  TIME_SLOTS,
+  SLOT_IDS,
+  FULL_DAY_SLOT_ID,
+  isFullDaySlotId,
+  isRequestFullDay,
+  isValidSlotId,
+  slotIdFromLegacyTime,
+  startTimeForSlot,
+  fullDayLabel,
+};
