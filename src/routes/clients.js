@@ -13,17 +13,59 @@ router.get("/", authRequired, roleRequired("admin"), async (_req, res) => {
   res.json(clients);
 });
 
+const CLIENT_TYPES = ["paire", "impaire", "vip"];
+
+function parseClientBody(body, { requirePassword }) {
+  const companyName = String(body.companyName || "").trim();
+  const headOfficeAddress = String(body.headOfficeAddress || "").trim();
+  const siret = String(body.siret || "").trim();
+  const managerName = String(body.managerName || "").trim();
+  const phone = String(body.phone || "").trim();
+  const email = String(body.email || "").trim().toLowerCase();
+  const clientType = String(body.clientType || "").trim();
+  const password = String(body.password || "").trim();
+  const notes = String(body.notes ?? "").trim();
+
+  if (!companyName) return { error: "Le nom de l'entreprise est obligatoire." };
+  if (!headOfficeAddress) return { error: "L'adresse du siege est obligatoire." };
+  if (!siret) return { error: "Le SIRET est obligatoire." };
+  if (!managerName) return { error: "Le nom du dirigeant / contact est obligatoire." };
+  if (!phone) return { error: "Le telephone est obligatoire." };
+  if (!email) return { error: "L'e-mail est obligatoire." };
+  if (!CLIENT_TYPES.includes(clientType)) return { error: "La regle calendrier (P2C) est obligatoire." };
+  if (requirePassword && !password) return { error: "Le mot de passe initial est obligatoire." };
+
+  return {
+    data: {
+      companyName,
+      headOfficeAddress,
+      siret,
+      managerName,
+      phone,
+      email,
+      clientType,
+      notes,
+      password,
+    },
+  };
+}
+
 router.post("/", authRequired, roleRequired("admin"), async (req, res) => {
-  const password = req.body.password || Math.random().toString(36).slice(-10);
+  const parsed = parseClientBody(req.body, { requirePassword: true });
+  if (parsed.error) return res.status(400).json({ message: parsed.error });
+
+  const { data } = parsed;
+  const password = data.password;
+
   const client = await Client.create({
-    companyName: req.body.companyName,
-    headOfficeAddress: req.body.headOfficeAddress,
-    siret: req.body.siret,
-    managerName: req.body.managerName,
-    phone: req.body.phone,
-    email: String(req.body.email).toLowerCase(),
-    clientType: req.body.clientType,
-    notes: req.body.notes,
+    companyName: data.companyName,
+    headOfficeAddress: data.headOfficeAddress,
+    siret: data.siret,
+    managerName: data.managerName,
+    phone: data.phone,
+    email: data.email,
+    clientType: data.clientType,
+    notes: data.notes,
   });
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -40,7 +82,24 @@ router.post("/", authRequired, roleRequired("admin"), async (req, res) => {
 });
 
 router.put("/:id", authRequired, roleRequired("admin"), async (req, res) => {
-  const client = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const parsed = parseClientBody(req.body, { requirePassword: false });
+  if (parsed.error) return res.status(400).json({ message: parsed.error });
+
+  const { data } = parsed;
+  const client = await Client.findByIdAndUpdate(
+    req.params.id,
+    {
+      companyName: data.companyName,
+      headOfficeAddress: data.headOfficeAddress,
+      siret: data.siret,
+      managerName: data.managerName,
+      phone: data.phone,
+      email: data.email,
+      clientType: data.clientType,
+      notes: data.notes,
+    },
+    { new: true, runValidators: true }
+  );
   if (!client) return res.status(404).json({ message: "Client introuvable" });
   res.json(client);
 });
